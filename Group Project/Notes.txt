@@ -1,0 +1,63 @@
+######################################## Modeling Ideas/Notes Key ############################################ 
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
+
+1) Need to deal with categoricals with too many buckets (either combine or maybe do a clustering algo?)
+2) Geographies may need to be clustered
+3) Probably don't need columns like ID, wpt_name (though maybe just having a name is important) or recorded_by
+3) How to deal with target variable having 3 categories
+4) Combine certain columns (e.g. source and source_type)
+5) Dealing with missing values for public_meeting and permit (should we use models to predict these)
+6) Created/predicted variables to use: different clusters based on categoricals?, distance from major city,
+distance from source, maybe certain management, scheme management groups, etc. are better than others, 
+
+
+
+
+############################################### Variable Key ################################################# 
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
+
+https://www.drivendata.org/competitions/7/pump-it-up-data-mining-the-water-table/page/25/#labels_list
+
+amount_tsh - Total static head (amount water available to waterpoint)
+date_recorded - The date the row was entered
+funder - Who funded the well
+gps_height - Altitude of the well
+installer - Organization that installed the well
+longitude - GPS coordinate
+latitude - GPS coordinate
+wpt_name - Name of the waterpoint if there is one
+num_private -
+basin - Geographic water basin
+subvillage - Geographic location
+region - Geographic location
+region_code - Geographic location (coded)
+district_code - Geographic location (coded)
+lga - Geographic location
+ward - Geographic location
+population - Population around the well
+public_meeting - True/False
+recorded_by - Group entering this row of data
+scheme_management - Who operates the waterpoint
+scheme_name - Who operates the waterpoint
+permit - If the waterpoint is permitted
+construction_year - Year the waterpoint was constructed
+extraction_type - The kind of extraction the waterpoint uses
+extraction_type_group - The kind of extraction the waterpoint uses
+extraction_type_class - The kind of extraction the waterpoint uses
+management - How the waterpoint is managed
+management_group - How the waterpoint is managed
+payment - What the water costs
+payment_type - What the water costs
+water_quality - The quality of the water
+quality_group - The quality of the water
+quantity - The quantity of water
+quantity_group - The quantity of water
+source - The source of the water
+source_type - The source of the water
+source_class - The source of the water
+waterpoint_type - The kind of waterpoint
+waterpoint_type_group - The kind of waterpoint
