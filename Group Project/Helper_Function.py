@@ -122,7 +122,7 @@ def boolean_dist(df, bools):
 
 #Small multiples of numerical value histograms
 def draw_histograms(df, variables, n_rows, n_cols):
-    fig=plt.figure()
+    fig=plt.figure(figsize=(15,8))
     for i, var_name in enumerate(variables):
         ax=fig.add_subplot(n_rows,n_cols,i+1)
         df[var_name].hist(bins=10,ax=ax)
