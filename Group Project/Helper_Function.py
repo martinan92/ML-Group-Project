@@ -73,6 +73,13 @@ def categorical_plot(df, categorical_features, var):
     sns.countplot(df[categorical_features[var]])
     plt.show()
 
+#Stacked bar chart for a categorical variable against the target
+def cat_stacked_bar(df, target, var):
+    plt.figure(figsize=(15,7)) 
+    df_plot = df.groupby([target, var]).size().reset_index().pivot(columns=target, index=var, values=0)
+    df_plot.plot(kind = 'bar', stacked = True)
+    plt.show()
+
 #Remove variables from category list that are too large or too small
 def drop_categorical(df, categoricals, upper_bound, lower_bound):
     reduced_cat = categoricals.copy()
@@ -96,6 +103,13 @@ def categorical_to_scale(df, var):
                           unique_val[1] else 0 for x in range(0,len(df[var]))]
     
     return new_df
+
+#For categoricals with too many unique vaues, instead will look at which are empty or nots
+def set_empty(df, cat_var):   
+    empty_var = [0 if x == 'none' else 1 for x in df[cat_var]]
+    new_var_name = cat_var + "_empty"
+    df[new_var_name] = empty_var
+    return df
 
 #Encodes categorical variables
 def onehot_encode(df, override = []):
