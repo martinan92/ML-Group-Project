@@ -73,6 +73,13 @@ def categorical_plot(df, categorical_features, var):
     sns.countplot(df[categorical_features[var]])
     plt.show()
 
+#Stacked bar chart for a categorical variable against the target
+def cat_stacked_bar(df, target, var):
+    plt.figure(figsize=(15,7)) 
+    df_plot = df.groupby([target, var]).size().reset_index().pivot(columns=target, index=var, values=0)
+    df_plot.plot(kind = 'bar', stacked = True)
+    plt.show()
+
 #Remove variables from category list that are too large or too small
 def drop_categorical(df, categoricals, upper_bound, lower_bound):
     reduced_cat = categoricals.copy()
@@ -96,6 +103,24 @@ def categorical_to_scale(df, var):
                           unique_val[1] else 0 for x in range(0,len(df[var]))]
     
     return new_df
+
+#Undo scaling on target variable for final output
+def undo_var_scaling(df, var, cat, new_col_name, drop = False):
+    new_df = df.copy()
+    unique_val = np.unique(df[var])  
+    new_df[new_col_name] = [cat[0] if x == unique_val[0] else cat[1] if x == unique_val[1] 
+                            else cat[2] for x in df[var]]  
+    if drop == True:
+        new_df = new_df.drop(var, axis = 1)
+
+    return new_df
+
+#For categoricals with too many unique vaues, instead will look at which are empty or nots
+def set_empty(df, cat_var):   
+    empty_var = [0 if x == 'none' else 1 for x in df[cat_var]]
+    new_var_name = cat_var + "_empty"
+    df[new_var_name] = empty_var
+    return df
 
 #Encodes categorical variables
 def onehot_encode(df, override = []):
@@ -372,4 +397,21 @@ def accuracy_plot(accuracy_list, threshold_list):
     plt.ylabel('Accuracy')
     plt.xticks([i for i in range(1, accuracy_list.shape[0], 2)], np.round(threshold_list[1::2], 1))
     plt.grid()
+    plt.show()
+
+#Plot Two Dimensional PCA graph
+def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
+    cdict={0:'red',1:'yellow',2:'green'}
+    marker={0:'x',1:'*',2:'o'}
+    alpha={0:.5, 1:.5, 2:.2}
+    fig,ax=plt.subplots(figsize=(7,5))
+    fig.patch.set_facecolor('white')
+    for l in np.unique(labels):
+        ax.scatter(transformed_data.loc[transformed_data[target] == l, pca_1],
+                transformed_data.loc[transformed_data[target] == l, pca_2],c=cdict[l],s=40,label=labl[l],
+                marker=marker[l],alpha=alpha[l])
+
+    plt.xlabel("PCA_{}".format(pca_1),fontsize=14)
+    plt.ylabel("PCA_{}".format(pca_2),fontsize=14)
+    plt.legend()
     plt.show()
