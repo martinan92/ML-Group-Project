@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.api as sm
 import matplotlib.pyplot as plt 
 from sklearn import preprocessing
-from sklearn.model_selection import train_test_split, KFold, cross_val_score, cross_val_predict
+from sklearn.model_selection import train_test_split, KFold, cross_val_score, cross_val_predict, StratifiedKFold
 from sklearn.feature_selection import RFECV
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import RobustScaler
@@ -102,6 +102,17 @@ def categorical_to_scale(df, var):
     new_df['func_band'] = [2 if df[var][x] == unique_val[0] else 1 if df[var][x] == 
                           unique_val[1] else 0 for x in range(0,len(df[var]))]
     
+    return new_df
+
+#Undo scaling on target variable for final output
+def undo_var_scaling(df, var, cat, new_col_name, drop = False):
+    new_df = df.copy()
+    unique_val = np.unique(df[var])  
+    new_df[new_col_name] = [cat[0] if x == unique_val[0] else cat[1] if x == unique_val[1] 
+                            else cat[2] for x in df[var]]  
+    if drop == True:
+        new_df = new_df.drop(var, axis = 1)
+
     return new_df
 
 #For categoricals with too many unique vaues, instead will look at which are empty or nots
@@ -233,21 +244,6 @@ def cv_evaluate(df, target_var, seed, C_input = 1000, max_input = 100):
     scores = cross_val_score(benchmark_model, X, y, scoring='accuracy', cv=kfolds)   
     return scores[scores >= 0.0]
 
-def ROC_curve(model, y_test_set, X_test_set):
-    logit_roc_auc = roc_auc_score(y_test_set, model.predict(X_test_set))
-    fpr, tpr, thresholds = roc_curve(y_test_set, model.predict_proba(X_test_set)[:,1])
-    plt.figure()
-    plt.plot(fpr, tpr, label='Logistic Regression (area = %0.2f)' % logit_roc_auc)
-    plt.plot([0, 1], [0, 1],'r--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver operating characteristic')
-    plt.legend(loc="lower right")
-    plt.savefig('Log_ROC')
-    plt.show()
-
 #Remove outliers from exogenous variables
 def remove_outliers(df):
     X = df.drop(['left'], axis=1)
@@ -257,11 +253,6 @@ def remove_outliers(df):
     test = fit.outlier_test()['bonf(p)']
     outliers = list(test[test<1e-3].index) 
     df.drop(df.index[outliers])
-    return df
-
-#Calculates average projects per year
-def projects_per_year(df):
-    df['projects_per_year'] = df['number_project']/df['time_spend_company']    
     return df
 
 #Removes under represented features
@@ -360,11 +351,54 @@ def NaN_removal(df):
     print('Need to remove {} columns with invalid entries.'.format(len(drop_cols)))
     return output_df
 
-#Standardization for Polynomial Feature
-def standardize2(df):
-    standardized_numericals = preprocessing.scale(df)
-    df = standardized_numericals  
-    return df
+#Plot Two Dimensional PCA graph
+def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
+    cdict={0:'red',1:'yellow',2:'green'}
+    marker={0:'x',1:'*',2:'o'}
+    alpha={0:.5, 1:.5, 2:.2}
+    fig,ax=plt.subplots(figsize=(7,5))
+    fig.patch.set_facecolor('white')
+    for l in np.unique(labels):
+        ax.scatter(transformed_data.loc[transformed_data[target] == l, pca_1],
+                transformed_data.loc[transformed_data[target] == l, pca_2],c=cdict[l],s=40,label=labl[l],
+                marker=marker[l],alpha=alpha[l])
+
+    plt.xlabel("PCA_{}".format(pca_1),fontsize=14)
+    plt.ylabel("PCA_{}".format(pca_2),fontsize=14)
+    plt.legend()
+    plt.show()
+
+def stacking(model,train,y,n_fold):
+    folds=StratifiedKFold(n_splits=n_fold,random_state=1)
+    train_pred=np.empty((0,1),float)
+    for train_indices,val_indices in folds.split(train,y.values):
+        x_train,x_val=train.iloc[train_indices],train.iloc[val_indices]
+        y_train,y_val=y.iloc[train_indices],y.iloc[val_indices]
+
+        model.fit(X=x_train,y=y_train.values.ravel()) 
+               
+    return train_pred
+
+
+################################ Not Applicable for Multinomial Classification ################################
+###############################################################################################################
+###############################################################################################################
+###############################################################################################################
+
+def ROC_curve(model, y_test_set, X_test_set):
+    logit_roc_auc = roc_auc_score(y_test_set, model.predict(X_test_set))
+    fpr, tpr, thresholds = roc_curve(y_test_set, model.predict_proba(X_test_set)[:,1])
+    plt.figure()
+    plt.plot(fpr, tpr, label='Logistic Regression (area = %0.2f)' % logit_roc_auc)
+    plt.plot([0, 1], [0, 1],'r--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic')
+    plt.legend(loc="lower right")
+    plt.savefig('Log_ROC')
+    plt.show()
 
 #Returns list of prediction accuracies
 def get_accuracy_list(model,X_test,y_test,y_pred):
@@ -387,3 +421,9 @@ def accuracy_plot(accuracy_list, threshold_list):
     plt.xticks([i for i in range(1, accuracy_list.shape[0], 2)], np.round(threshold_list[1::2], 1))
     plt.grid()
     plt.show()
+
+#Standardization for Polynomial Feature
+def standardize2(df):
+    standardized_numericals = preprocessing.scale(df)
+    df = standardized_numericals  
+    return df
