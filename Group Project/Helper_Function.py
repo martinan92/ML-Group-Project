@@ -268,8 +268,8 @@ def score_model(data, dependent_var, size, seed):
 
 def cv_evaluate(df, target_var, seed, cv):
     # Create Random Forest object
-    lm = RandomForestClassifier(random_state = seed)
-    kfolds = KFold(n_splits=10, shuffle=True, random_state=seed)
+    lm = RandomForestClassifier(random_state = seed, max_features = 'auto')
+    kfolds = KFold(n_splits=cv, shuffle=True, random_state=seed)
 
     X = df.drop([target_var], axis=1)
     y = df.func_band.reset_index(drop=True)
