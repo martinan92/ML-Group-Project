@@ -3,9 +3,9 @@ import pandas as pd
 import statsmodels.api as sm
 import matplotlib.pyplot as plt 
 from sklearn import preprocessing
-from sklearn.model_selection import train_test_split, KFold, cross_val_score, cross_val_predict, StratifiedKFold
+from sklearn.model_selection import train_test_split, KFold, GridSearchCV, cross_val_score, cross_val_predict, StratifiedKFold
 from sklearn.feature_selection import RFECV
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.preprocessing import RobustScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve, accuracy_score
@@ -155,6 +155,39 @@ def draw_histograms(df, variables, n_rows, n_cols):
     fig.tight_layout()
     plt.show()
 
+#Reduce the number of categories by grouping those below a certain percentile
+def group_underrepresented_cat(df, var, tol = 0.001):
+    for cat in df[var].unique():
+        cat_percentile = len(df.loc[df[var] == cat,var])/len(df[var])
+        if cat_percentile < tol:
+            df.loc[df[var] == cat,var] = 'other'
+    return df
+
+def group_mean(df, group_vars, target_vars, verbose = False):
+    #Compute population, long and lats averages in districts within regions
+    region_district_mean = df.groupby([group_vars[0],group_vars[1]]).mean()
+    region_district_mean_1 = pd.DataFrame(region_district_mean[target_vars[0]])
+    region_district_mean_2= pd.DataFrame(region_district_mean[target_vars[1]])
+    region_district_mean_3 = pd.DataFrame(region_district_mean[target_vars[2]])
+
+    #Map based on district and region (multi-index dataframe)
+    for row in range(len(df)):
+        #Population
+        if df.loc[row, target_vars[0]] == 0:
+            df.loc[row, target_vars[0]] = region_district_mean_1.loc[(df.loc[row, group_vars[0]],
+                                            df.loc[row, group_vars[1]]), target_vars[0]]
+        #Latitude
+        if df.loc[row, target_vars[1]] == 0:
+            df.loc[row, target_vars[1]] = region_district_mean_2.loc[(df.loc[row, group_vars[0]],
+                                            df.loc[row, group_vars[1]]), target_vars[1]]
+        #Longitude
+        if df.loc[row, target_vars[2]] == 0:
+            df.loc[row, target_vars[2]] = region_district_mean_3.loc[(df.loc[row, group_vars[0]],
+                                            df.loc[row, group_vars[1]]), target_vars[2]]
+    if verbose == True:
+        print(df.head())
+    return df
+
 #Checks which features have skewness present
 def feature_skewness(df):
     numeric_dtypes = ['int16', 'int32', 'int64', 
@@ -229,17 +262,17 @@ def score_model(data, dependent_var, size, seed):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=size, random_state=seed)
     
     # Create logistic regression object
-    classifier = LogisticRegression(solver='lbfgs')
+    classifier = RandomForestClassifier(random_state = seed)
     classifier.fit(X_train, y_train)   
     return classifier.score(X_test, y_test)
 
-def cv_evaluate(df, target_var, seed, C_input = 1000, max_input = 100):
-    # Create logistic regression object
-    lm = LogisticRegression(solver='lbfgs', C = C_input, max_iter = max_input)
+def cv_evaluate(df, target_var, seed, cv):
+    # Create Random Forest object
+    lm = RandomForestClassifier(random_state = seed)
     kfolds = KFold(n_splits=10, shuffle=True, random_state=seed)
 
     X = df.drop([target_var], axis=1)
-    y = df.left.reset_index(drop=True)
+    y = df.func_band.reset_index(drop=True)
     benchmark_model = make_pipeline(RobustScaler(), lm).fit(X=X, y=y)
     scores = cross_val_score(benchmark_model, X, y, scoring='accuracy', cv=kfolds)   
     return scores[scores >= 0.0]
@@ -266,38 +299,15 @@ def under_represented_features(df):
     df.drop(under_rep, axis=1, inplace=True)
     return df
 
-#Create binned variable for a given continuous variable
-def binning(col, cut_points, labels=None):
-    #Define min and max values:
-    min_val = col.min()
-    max_val = col.max()    
-    #create list by adding min and max to cut_points
-    break_points = [min_val] + cut_points + [max_val]
-    #if no labels provided, use default labels 0 ... (n-1)
-    if not labels:
-        labels = range(len(cut_points)+1)
-    #Binning using cut function of pandas
-    colBin = pd.cut(col, bins=break_points, labels=labels, include_lowest=True)
-    return colBin
+#Add feature that was previously created
+def pre_created_features(df, feature, feature_name):
+    df[feature_name] = feature_skewness
+    return df
 
-#Choose variable to be binned and passed to binning function, output updated df
-def bin_continuous_var(df, override = ''):
-    numerical = numerical_features(df)
-    booleans = boolean_features(df)
-    
-    #Choose only continuous numerical variables to be binned
-    binned_variables = (list(set(numerical) - set(booleans)))
-    
-    if len(override) > 0:
-        binned_variables.remove(override)
-    
-    #Bin based on median and 1 standard deviation above and below
-    for var in binned_variables:
-        var_nam = 'binned_' + str(var)
-        cut_points = [df[var].median(axis = 0) - df[var].std(axis = 0), df[var].median(axis = 0), 
-                      df[var].median(axis = 0) + df[var].std(axis = 0)]
-        df[var_nam] = binning(df[var], cut_points)
-    
+#Calculates the operation years of a well
+def operation_years(df):
+    df['operation_year'] = df['Year'] - df['construction_year']
+    df.loc[df['operation_year'] < 0, 'operation_year'] = 0
     return df
 
 #Iteratively cycles throughout input feature engineering functions and determines their effect on the model
@@ -326,10 +336,10 @@ def feature_engineering_pipeline(raw_data_total, raw_data_test, dependent_var, s
             print('[Rejected]')
     return selected_functions, engineered_data_total
 
-def feature_reduction(model, score_target, X_entire_set, X_train_set, y_train_set):
+def feature_reduction(model, score_target, cv_input, X_entire_set, X_train_set, y_train_set):
     # Create the RFE object and compute a cross-validated score.
     # The "accuracy" scoring is proportional to the number of correct classifications
-    rfecv = RFECV(model, step=1, cv=10, scoring=score_target)
+    rfecv = RFECV(model, step=1, cv = cv_input, scoring=score_target)
     rfecv.fit(X_train_set, y_train_set.values.ravel())
 
     print("Optimal number of features: %d" % rfecv.n_features_)
@@ -368,16 +378,34 @@ def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
     plt.legend()
     plt.show()
 
-def stacking(model,train,y,n_fold):
-    folds=StratifiedKFold(n_splits=n_fold,random_state=1)
-    train_pred=np.empty((0,1),float)
-    for train_indices,val_indices in folds.split(train,y.values):
-        x_train,x_val=train.iloc[train_indices],train.iloc[val_indices]
-        y_train,y_val=y.iloc[train_indices],y.iloc[val_indices]
+#Tune model and give output based on given parameters
+def tune_model(estimator, param, n_jobs, X_train, y_train, scoring_metric = 'accuracy', cv = 5, verbose = False):
+    gsearch = GridSearchCV(estimator = estimator, param_grid = param, 
+                                    scoring=scoring_metric,n_jobs=n_jobs, cv=cv)
+    gsearch.fit(X_train, y_train)
+    tuned_model= gsearch.best_estimator_ 
 
-        model.fit(X=x_train,y=y_train.values.ravel()) 
-               
-    return train_pred
+    if(verbose == True):
+        print('='*20)
+        print("best params: " + str(gsearch.best_estimator_))
+        print("best params: " + str(gsearch.best_params_))
+        print('best score:', gsearch.best_score_)
+        print('='*20)
+
+    return tuned_model
+
+#Prepare and save model results in required csv format
+def csv_conversion(df, y, old_target_name, new_target_name,target_cat, file_name ='new.csv'):
+    #Merge prediction with original data set to map with id
+    raw_output = df.join(y)
+    raw_output = raw_output.loc[:,['id', old_target_name]]
+
+    #Undo scaling of target variable to revert to original format
+    clean_output = undo_var_scaling(raw_output, old_target_name, new_col_name = new_target_name,  
+                                    cat = target_cat,
+                                    drop = True)
+  
+    return clean_output
 
 
 ################################ Not Applicable for Multinomial Classification ################################
@@ -426,4 +454,38 @@ def accuracy_plot(accuracy_list, threshold_list):
 def standardize2(df):
     standardized_numericals = preprocessing.scale(df)
     df = standardized_numericals  
+    return df
+
+#Create binned variable for a given continuous variable
+def binning(col, cut_points, labels=None):
+    #Define min and max values:
+    min_val = col.min()
+    max_val = col.max()    
+    #create list by adding min and max to cut_points
+    break_points = [min_val] + cut_points + [max_val]
+    #if no labels provided, use default labels 0 ... (n-1)
+    if not labels:
+        labels = range(len(cut_points)+1)
+    #Binning using cut function of pandas
+    colBin = pd.cut(col, bins=break_points, labels=labels, include_lowest=True)
+    return colBin
+
+#Choose variable to be binned and passed to binning function, output updated df
+def bin_continuous_var(df, override = ''):
+    numerical = numerical_features(df)
+    booleans = boolean_features(df)
+    
+    #Choose only continuous numerical variables to be binned
+    binned_variables = (list(set(numerical) - set(booleans)))
+    
+    if len(override) > 0:
+        binned_variables.remove(override)
+    
+    #Bin based on median and 1 standard deviation above and below
+    for var in binned_variables:
+        var_nam = 'binned_' + str(var)
+        cut_points = [df[var].median(axis = 0) - df[var].std(axis = 0), df[var].median(axis = 0), 
+                      df[var].median(axis = 0) + df[var].std(axis = 0)]
+        df[var_nam] = binning(df[var], cut_points)
+    
     return df
