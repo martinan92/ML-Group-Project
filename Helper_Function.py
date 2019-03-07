@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve, accuracy
 from scipy.stats import skew, boxcox_normmax
 from scipy.special import boxcox1p
 from matplotlib.gridspec import GridSpec
+from gplearn.genetic import SymbolicTransformer
 from random import randint
 import seaborn as sns
 sns.set(style="darkgrid")
@@ -220,7 +221,6 @@ def standardize2(df):
 #Plots heatmap of confusion matrix
 def confusion_heat_map(test_set, prediction_set):
     cm = confusion_matrix(test_set, prediction_set)
-
     class_names=[0,1] # name  of classes
     fig, ax = plt.subplots()
     tick_marks = np.arange(len(class_names))
@@ -266,6 +266,26 @@ def remove_outliers(df):
     outliers = list(test[test<1e-3].index) 
     df.drop(df.index[outliers])
     return df
+
+#Genetic Program Features
+def gp_features(df, target, random_state, generations = 5, function_set = ['add', 'sub', 'mul', 'div']):
+    X = df.loc[:,(df.columns != target)]
+    y = df.loc[:, target]   
+    
+    gp = SymbolicTransformer(generations=generations, population_size=1000,
+                         hall_of_fame=100, n_components=12,
+                         function_set=function_set,
+                         parsimony_coefficient=0.0005,
+                         max_samples=0.9, verbose=0,
+                         random_state=random_state, n_jobs=-1)
+    gp.fit(pd.get_dummies(X), y)
+    gp_features = gp.transform(pd.get_dummies(X))
+
+    feats = pd.DataFrame(gp_features)
+    feats.columns = ['gp{}'.format(i) for i in range(len(list(feats)))]
+    df = pd.concat([df, feats], axis = 1)
+    
+    return df, gp.transform
 
 #Removes under represented features
 def under_represented_features(df):
