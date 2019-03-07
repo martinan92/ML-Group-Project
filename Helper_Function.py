@@ -103,9 +103,13 @@ def categorical_to_scale(df, var):
     return new_df
 
 #Undo scaling on target variable for final output
-def undo_var_scaling(df, var, cat, new_col_name, drop = False):
+def undo_var_scaling(df, var, cat, new_col_name, unqiue_override=[], drop = False):
     new_df = df.copy()
-    unique_val = np.unique(df[var])  
+    if len(unqiue_override) > 0:
+        unique_val = unqiue_override
+    else:
+        unique_val = np.unique(df[var])  
+
     new_df[new_col_name] = [cat[0] if x == unique_val[0] else cat[1] if x == unique_val[1] 
                             else cat[2] for x in df[var]]  
     if drop == True:
@@ -356,14 +360,14 @@ def tune_model(estimator, param, n_jobs, X_train, y_train, scoring_metric = 'acc
     return tuned_model
 
 #Prepare and save model results in required csv format
-def csv_conversion(df, y, old_target_name, new_target_name,target_cat, file_name ='new.csv'):
+def csv_conversion(df, y, old_target_name, new_target_name,target_cat, unqiue_override=[], file_name ='new.csv'):
     #Merge prediction with original data set to map with id
     raw_output = df.join(y)
     raw_output = raw_output.loc[:,['id', old_target_name]]
 
     #Undo scaling of target variable to revert to original format
-    clean_output = undo_var_scaling(raw_output, old_target_name, new_col_name = new_target_name,  
-                                    cat = target_cat, drop = True)
+    clean_output = undo_var_scaling(raw_output, old_target_name, new_col_name = new_target_name, 
+                                    unqiue_override = unqiue_override, cat = target_cat, drop = True)
     return clean_output
 
 #Ensure final test set matches train data set
