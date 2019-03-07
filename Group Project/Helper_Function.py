@@ -38,10 +38,8 @@ def categorical_features(df):
 #Returns booleans variables
 def boolean_features(df):
     boolean_columns = df.columns
-    boolean_columns = [x for x in boolean_columns if ((len(df[x].unique()) == 2) 
-                        and (0 in df[x].unique() and 1 in df[x].unique())) or (
-                        'FALSE' in df[x].unique() and 'TRUE' in df[x].unique())]
-
+    boolean_columns = [x for x in boolean_columns if ((len(df[x].unique()) == 2) and (0 in df[x].unique() and 
+                      1 in df[x].unique())) or ('FALSE' in df[x].unique() and 'TRUE' in df[x].unique())]
     return boolean_columns
 
 #Checks given dataframe for nulls and returns columns where there are any present
@@ -82,8 +80,7 @@ def cat_stacked_bar(df, target, var):
 
 #Remove variables from category list that are too large or too small
 def drop_categorical(df, categoricals, upper_bound, lower_bound):
-    reduced_cat = categoricals.copy()
-    
+    reduced_cat = categoricals.copy() 
     large_drop = [column for column in reduced_cat if (df[column].nunique() > upper_bound)]
     small_drop = [column for column in reduced_cat if (df[column].nunique() < lower_bound)]
     reduced_cat = [x for x in reduced_cat if x not in large_drop]
@@ -133,17 +130,9 @@ def onehot_encode(df, override = []):
         new_df = numericals.copy()
         cat = categorical_features(df)
     for categorical_column in cat:
-        new_df = pd.concat([new_df, pd.get_dummies(df[categorical_column], prefix = 
-                categorical_column)], axis=1)     
+        new_df = pd.concat([new_df, pd.get_dummies(df[categorical_column], prefix = categorical_column)], 
+                axis=1)     
     return new_df
-
-#Gets the distribution of given list of booleans
-def boolean_dist(df, bools):
-    output = []
-    for col in bools:
-        dist = df[col].value_counts()
-        output.append(dist)
-    return output
 
 #Small multiples of numerical value histograms
 def draw_histograms(df, variables, n_rows, n_cols):
@@ -219,29 +208,18 @@ def fix_skewness(df):
 
 def standardize(df, numerical_values):
     standardized_numericals = preprocessing.scale(df[numerical_values])
-    df[numerical_values] = standardized_numericals
-    
+    df[numerical_values] = standardized_numericals  
     return df
 
-#Remove highly correlated variables
-def correlation_removal(y_set, percent = 0.99):
-    corr_matrix = y_set.corr().abs()
-
-    #Select upper triangle of correlation matrix
-    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
-
-    #Find index of feature columns with correlation greater than given percentage
-    to_drop = [column for column in upper.columns if any(upper[column] >= percent)]
-
-    print('Need to remove {} columns with >= 0.99 correlation.'.format(len(to_drop)))
-    y_set = y_set[[x for x in y_set if x not in to_drop]]
-    
-    return y_set
+#Standardization for Polynomial Feature
+def standardize2(df):
+    standardized_numericals = preprocessing.scale(df)
+    df = standardized_numericals  
+    return df
 
 #Plots heatmap of confusion matrix
 def confusion_heat_map(test_set, prediction_set):
     cm = confusion_matrix(test_set, prediction_set)
-
     class_names=[0,1] # name  of classes
     fig, ax = plt.subplots()
     tick_marks = np.arange(len(class_names))
@@ -299,42 +277,11 @@ def under_represented_features(df):
     df.drop(under_rep, axis=1, inplace=True)
     return df
 
-#Add feature that was previously created
-def pre_created_features(df, feature, feature_name):
-    df[feature_name] = feature_skewness
-    return df
-
 #Calculates the operation years of a well
 def operation_years(df):
     df['operation_year'] = df['Year'] - df['construction_year']
     df.loc[df['operation_year'] < 0, 'operation_year'] = 0
     return df
-
-#Iteratively cycles throughout input feature engineering functions and determines their effect on the model
-def feature_engineering_pipeline(raw_data_total, raw_data_test, dependent_var, sample_size, seed, fe_functions):
-    selected_functions = []
-    base_score = score_model(raw_data_test, dependent_var, sample_size, seed)
-    print('Base Accuracy on Training Set: {:.4f}'.format(base_score))
-    #Applying approved engineering on entire dataset, but testing its validity only on test set
-    engineered_data_total = raw_data_total.copy()
-    engineered_data_test = raw_data_test.copy()
-    for fe_function in fe_functions:
-        processed_data_total = globals()[fe_function](engineered_data_total)
-        processed_data_test = globals()[fe_function](engineered_data_test)
-        new_score = score_model(processed_data_test, dependent_var, sample_size, seed)
-        print('- New Accuracy ({}): {:.4f} '.format(fe_function, new_score), 
-              end='')
-        difference = (new_score-base_score)
-        print('[diff: {:.4f}] '.format(difference), end='')
-        if difference > -0.01:
-            selected_functions.append(fe_function)
-            engineered_data_total = processed_data_total.copy()
-            engineered_data_test = processed_data_test.copy()
-            base_score = new_score
-            print('[Accepted]')
-        else:
-            print('[Rejected]')
-    return selected_functions, engineered_data_total
 
 def feature_reduction(model, score_target, cv_input, X_entire_set, X_train_set, y_train_set):
     # Create the RFE object and compute a cross-validated score.
@@ -354,13 +301,6 @@ def feature_reduction(model, score_target, cv_input, X_entire_set, X_train_set, 
     
     return X_entire_set[X_entire_set.columns[rfecv.support_]], rfecv.estimator_
 
-#Remove engineered features that resulted in invalid entries
-def NaN_removal(df):
-    drop_cols = [x for x in df if df[x].isnull().sum() == len(df)]
-    output_df = df.drop(drop_cols, axis = 1)
-    print('Need to remove {} columns with invalid entries.'.format(len(drop_cols)))
-    return output_df
-
 #Plot Two Dimensional PCA graph
 def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
     cdict={0:'red',1:'yellow',2:'green'}
@@ -370,8 +310,8 @@ def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
     fig.patch.set_facecolor('white')
     for l in np.unique(labels):
         ax.scatter(transformed_data.loc[transformed_data[target] == l, pca_1],
-                transformed_data.loc[transformed_data[target] == l, pca_2],c=cdict[l],s=40,label=labl[l],
-                marker=marker[l],alpha=alpha[l])
+            transformed_data.loc[transformed_data[target] == l, pca_2],c=cdict[l],s=40,label=labl[l],
+            marker=marker[l],alpha=alpha[l])
 
     plt.xlabel("PCA_{}".format(pca_1),fontsize=14)
     plt.ylabel("PCA_{}".format(pca_2),fontsize=14)
@@ -402,13 +342,20 @@ def csv_conversion(df, y, old_target_name, new_target_name,target_cat, file_name
 
     #Undo scaling of target variable to revert to original format
     clean_output = undo_var_scaling(raw_output, old_target_name, new_col_name = new_target_name,  
-                                    cat = target_cat,
-                                    drop = True)
-  
+                                    cat = target_cat, drop = True)
     return clean_output
 
+#Ensure final test set matches train data set
+def column_sync(X_test, X_test_col, X_train_col):
+    X_baseline_test = X_test.copy()
+    for x in range(0,min(len(X_train_col),len(X_test_col))):
+        if X_train_col[x] != X_test_col[x] and X_train_col[x] not in X_test_col:
+            X_baseline_test[X_train_col[x]] = 0 * len(X_baseline_test.index)
+        if X_train_col[x] != X_test_col[x] and X_test_col[x] not in X_train_col:
+            X_baseline_test = X_baseline_test.drop(X_test_col[x], axis = 1)
+    return X_baseline_test
 
-################################ Not Applicable for Multinomial Classification ################################
+####################################### Not Applicable for this Project #######################################
 ###############################################################################################################
 ###############################################################################################################
 ###############################################################################################################
@@ -450,12 +397,6 @@ def accuracy_plot(accuracy_list, threshold_list):
     plt.grid()
     plt.show()
 
-#Standardization for Polynomial Feature
-def standardize2(df):
-    standardized_numericals = preprocessing.scale(df)
-    df = standardized_numericals  
-    return df
-
 #Create binned variable for a given continuous variable
 def binning(col, cut_points, labels=None):
     #Define min and max values:
@@ -489,3 +430,59 @@ def bin_continuous_var(df, override = ''):
         df[var_nam] = binning(df[var], cut_points)
     
     return df
+
+#Remove highly correlated variables
+def correlation_removal(y_set, percent = 0.99):
+    corr_matrix = y_set.corr().abs()
+
+    #Select upper triangle of correlation matrix
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+
+    #Find index of feature columns with correlation greater than given percentage
+    to_drop = [column for column in upper.columns if any(upper[column] >= percent)]
+
+    print('Need to remove {} columns with >= 0.99 correlation.'.format(len(to_drop)))
+    y_set = y_set[[x for x in y_set if x not in to_drop]]
+    
+    return y_set
+
+#Remove engineered features that resulted in invalid entries
+def NaN_removal(df):
+    drop_cols = [x for x in df if df[x].isnull().sum() == len(df)]
+    output_df = df.drop(drop_cols, axis = 1)
+    print('Need to remove {} columns with invalid entries.'.format(len(drop_cols)))
+    return output_df
+
+#Iteratively cycles throughout input feature engineering functions and determines their effect on the model
+def feature_engineering_pipeline(raw_data_total, raw_data_test, dependent_var, sample_size, seed, fe_functions):
+    selected_functions = []
+    base_score = score_model(raw_data_test, dependent_var, sample_size, seed)
+    print('Base Accuracy on Training Set: {:.4f}'.format(base_score))
+    #Applying approved engineering on entire dataset, but testing its validity only on test set
+    engineered_data_total = raw_data_total.copy()
+    engineered_data_test = raw_data_test.copy()
+    for fe_function in fe_functions:
+        processed_data_total = globals()[fe_function](engineered_data_total)
+        processed_data_test = globals()[fe_function](engineered_data_test)
+        new_score = score_model(processed_data_test, dependent_var, sample_size, seed)
+        print('- New Accuracy ({}): {:.4f} '.format(fe_function, new_score), 
+              end='')
+        difference = (new_score-base_score)
+        print('[diff: {:.4f}] '.format(difference), end='')
+        if difference > -0.01:
+            selected_functions.append(fe_function)
+            engineered_data_total = processed_data_total.copy()
+            engineered_data_test = processed_data_test.copy()
+            base_score = new_score
+            print('[Accepted]')
+        else:
+            print('[Rejected]')
+    return selected_functions, engineered_data_total
+
+#Gets the distribution of given list of booleans
+def boolean_dist(df, bools):
+    output = []
+    for col in bools:
+        dist = df[col].value_counts()
+        output.append(dist)
+    return output
