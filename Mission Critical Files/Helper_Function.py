@@ -45,11 +45,13 @@ def boolean_features(df):
 
 #Checks given dataframe for nulls and returns columns where there are any present
 def null_check(df):
-    if df.isnull().values.any() == False:
+    if df.isnull().values.any() == False and df.isna().values.any() == False:
         print("No nulls present.")
     else:
-        null_count = df.columns[df.isna().any()].tolist()
-        print("The following columns have nulls: ", null_count)
+        null_count = df.columns[df.isnull().any()].tolist()
+        na_count = df.columns[df.isna().any()].tolist()
+        blank_count = null_count.append(na_count)
+        print("The following columns have nulls: ", blank_count)
 
 #Plots density plot against target variable for given scale variables
 def density_plot(df, var, lower_bound, upper_bound):
@@ -350,7 +352,7 @@ def tune_model(estimator, param, n_jobs, X_train, y_train, scoring_metric = 'acc
         gsearch = GridSearchCV(estimator = estimator, param_grid = param, 
                                     scoring=scoring_metric,n_jobs=n_jobs, cv=cv)
     else:
-        gsearch = RandomizedSearchCV(estimator = estimator, param_grid = param, 
+        gsearch = RandomizedSearchCV(estimator = estimator, param_distributions = param, 
                                     scoring=scoring_metric,n_jobs=n_jobs, cv=cv)
     gsearch.fit(X_train, y_train)
     tuned_model= gsearch.best_estimator_ 
