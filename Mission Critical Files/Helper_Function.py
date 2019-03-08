@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.api as sm
 import matplotlib.pyplot as plt 
 from sklearn import preprocessing
-from sklearn.model_selection import train_test_split, KFold, GridSearchCV, cross_val_score, cross_val_predict, StratifiedKFold
+from sklearn.model_selection import train_test_split, KFold, RandomizedSearchCV, GridSearchCV, cross_val_score, cross_val_predict, StratifiedKFold
 from sklearn.feature_selection import RFECV
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.preprocessing import RobustScaler
@@ -344,8 +344,13 @@ def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
     plt.show()
 
 #Tune model and give output based on given parameters
-def tune_model(estimator, param, n_jobs, X_train, y_train, scoring_metric = 'accuracy', cv = 5, verbose = False):
-    gsearch = GridSearchCV(estimator = estimator, param_grid = param, 
+def tune_model(estimator, param, n_jobs, X_train, y_train, scoring_metric = 'accuracy', cv = 5, 
+               gridSearch = False, verbose = False):
+    if gridSearch == True:
+        gsearch = GridSearchCV(estimator = estimator, param_grid = param, 
+                                    scoring=scoring_metric,n_jobs=n_jobs, cv=cv)
+    else:
+        gsearch = RandomizedSearchCV(estimator = estimator, param_grid = param, 
                                     scoring=scoring_metric,n_jobs=n_jobs, cv=cv)
     gsearch.fit(X_train, y_train)
     tuned_model= gsearch.best_estimator_ 
