@@ -14,6 +14,7 @@ from scipy.special import boxcox1p
 from matplotlib.gridspec import GridSpec
 from gplearn.genetic import SymbolicTransformer
 from random import randint
+from math import sin, cos, sqrt, asin, radians
 import seaborn as sns
 sns.set(style="darkgrid")
 
@@ -160,11 +161,12 @@ def group_underrepresented_cat(df, var, tol = 0.001):
     return df
 
 def group_mean(df, group_vars, target_vars, verbose = False):
-    #Compute population, long and lats averages in districts within regions
+    #Compute population, long, lats, and gps_height averages in districts within regions
     region_district_mean = df.groupby([group_vars[0],group_vars[1]]).mean()
     region_district_mean_1 = pd.DataFrame(region_district_mean[target_vars[0]])
     region_district_mean_2= pd.DataFrame(region_district_mean[target_vars[1]])
     region_district_mean_3 = pd.DataFrame(region_district_mean[target_vars[2]])
+    region_district_mean_4 = pd.DataFrame(region_district_mean[target_vars[3]])
 
     #Map based on district and region (multi-index dataframe)
     for row in range(len(df)):
@@ -180,6 +182,11 @@ def group_mean(df, group_vars, target_vars, verbose = False):
         if df.loc[row, target_vars[2]] == 0:
             df.loc[row, target_vars[2]] = region_district_mean_3.loc[(df.loc[row, group_vars[0]],
                                             df.loc[row, group_vars[1]]), target_vars[2]]
+
+        #GPS height
+        if df.loc[row, target_vars[3]] == 0:
+            df.loc[row, target_vars[3]] = region_district_mean_4.loc[(df.loc[row, group_vars[0]],
+                                            df.loc[row, group_vars[1]]), target_vars[3]]
     if verbose == True:
         print(df.head())
     return df
@@ -253,7 +260,7 @@ def score_model(data, dependent_var, size, seed):
 
 def cv_evaluate(df, target_var, seed, cv):
     # Create Random Forest object
-    lm = RandomForestClassifier(random_state = seed, max_features = 'auto')
+    lm = RandomForestClassifier(random_state = seed)
     kfolds = KFold(n_splits=cv, shuffle=True, random_state=seed)
 
     X = df.drop([target_var], axis=1)
@@ -314,23 +321,41 @@ def operation_years(df):
     df.loc[df['operation_year'] < 0, 'operation_year'] = 0
     return df
 
-def feature_reduction(model, score_target, cv_input, X_entire_set, X_train_set, y_train_set):
-    # Create the RFE object and compute a cross-validated score.
-    # The "accuracy" scoring is proportional to the number of correct classifications
-    rfecv = RFECV(model, step=1, cv = cv_input, scoring=score_target)
-    rfecv.fit(X_train_set, y_train_set.values.ravel())
+def haversine(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # convert decimal degrees to radians 
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
 
-    print("Optimal number of features: %d" % rfecv.n_features_)
-    print('Selected features: %s' % list(X_train_set.columns[rfecv.support_]))
+    # haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a)) 
+    r = 6371 # Radius of earth in kilometers. Use 3956 for miles
+    return c * r
 
-    # Plot number of features VS. cross-validation scores
-    plt.figure(figsize=(8,5))
-    plt.xlabel("Number of features selected")
-    plt.ylabel("Cross validation score (nb of correct classifications)")
-    plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
-    plt.show()
-    
-    return X_entire_set[X_entire_set.columns[rfecv.support_]], rfecv.estimator_
+def distance_from_capital(df, capital_lon, capital_lat):
+    distance =[]
+    for x in range(len(df)):
+        distance.append(haversine(capital_lon, capital_lat, df.loc[x,'longitude'],df.loc[x,'latitude']))
+
+    df['distance'] = distance
+    return df
+
+def test_feature_engineering(target, model, X, y, random_state, test_size):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+    model = model.fit(X_train,y_train.values.ravel())
+
+    df = X.join(y)
+    print('Accuracy of Feature: {:.3f}'.format(model.score(X_test, y_test.values.ravel())))
+    accuracy = cv_evaluate(df, target, random_state, cv = 5)
+    print('Mean Accuracy after CV: {:.3f} +/- {:.03f}'.format(np.mean(accuracy), np.std(accuracy)))
+    print('Best Accuracy after CV: {:.3f}'.format(max(accuracy)))
+
+    return df
 
 #Plot Two Dimensional PCA graph
 def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
@@ -522,3 +547,21 @@ def boolean_dist(df, bools):
         dist = df[col].value_counts()
         output.append(dist)
     return output
+
+def feature_reduction(model, score_target, cv_input, X_entire_set, X_train_set, y_train_set):
+    # Create the RFE object and compute a cross-validated score.
+    # The "accuracy" scoring is proportional to the number of correct classifications
+    rfecv = RFECV(model, step=1, cv = cv_input, scoring=score_target)
+    rfecv.fit(X_train_set, y_train_set.values.ravel())
+
+    print("Optimal number of features: %d" % rfecv.n_features_)
+    print('Selected features: %s' % list(X_train_set.columns[rfecv.support_]))
+
+    # Plot number of features VS. cross-validation scores
+    plt.figure(figsize=(8,5))
+    plt.xlabel("Number of features selected")
+    plt.ylabel("Cross validation score (nb of correct classifications)")
+    plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
+    plt.show()
+    
+    return X_entire_set[X_entire_set.columns[rfecv.support_]], rfecv.estimator_
