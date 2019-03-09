@@ -285,13 +285,17 @@ def gp_features(df, target, random_state, generations = 5, function_set = ['add'
                          max_samples=0.9, verbose=0,
                          random_state=random_state, n_jobs=-1)
     gp.fit(pd.get_dummies(X), y)
-    gp_features = gp.transform(pd.get_dummies(X))
+    df = gp_transform(df, gp.transform, X)
+    
+    return df, gp.transform
 
+#Transform data using input genetic transformer
+def gp_transform(df, transformer,X):
+    gp_features = transformer(pd.get_dummies(X))
     feats = pd.DataFrame(gp_features)
     feats.columns = ['gp{}'.format(i) for i in range(len(list(feats)))]
     df = pd.concat([df, feats], axis = 1)
-    
-    return df, gp.transform
+    return df
 
 #Removes under represented features
 def under_represented_features(df):
@@ -367,7 +371,7 @@ def tune_model(estimator, param, n_jobs, X_train, y_train, scoring_metric = 'acc
     return tuned_model
 
 #Prepare and save model results in required csv format
-def csv_conversion(df, y, old_target_name, new_target_name,target_cat, unqiue_override=[], file_name ='new.csv'):
+def csv_conversion(df, y, old_target_name, new_target_name,target_cat, unqiue_override=[]):
     #Merge prediction with original data set to map with id
     raw_output = df.join(y)
     raw_output = raw_output.loc[:,['id', old_target_name]]
