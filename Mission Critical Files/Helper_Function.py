@@ -345,44 +345,28 @@ def distance_from_capital(df, capital_lon, capital_lat):
     df['distance'] = distance
     return df
 
-def test_feature_engineering(target, model, X, y, random_state, test_size):
+def test_feature_engineering(target, model, X, y, n_splits, random_state, test_size):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
     model = model.fit(X_train,y_train.values.ravel())
 
     df = X.join(y)
     print('Accuracy of Feature: {:.3f}'.format(model.score(X_test, y_test.values.ravel())))
-    accuracy = cv_evaluate(df, target, random_state, cv = 5)
+    accuracy = cv_evaluate(df, target, random_state, cv = n_splits)
     print('Mean Accuracy after CV: {:.3f} +/- {:.03f}'.format(np.mean(accuracy), np.std(accuracy)))
     print('Best Accuracy after CV: {:.3f}'.format(max(accuracy)))
 
     return df
 
-#Plot Two Dimensional PCA graph
-def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
-    cdict={0:'red',1:'yellow',2:'green'}
-    marker={0:'x',1:'*',2:'o'}
-    alpha={0:.5, 1:.5, 2:.2}
-    fig,ax=plt.subplots(figsize=(7,5))
-    fig.patch.set_facecolor('white')
-    for l in np.unique(labels):
-        ax.scatter(transformed_data.loc[transformed_data[target] == l, pca_1],
-            transformed_data.loc[transformed_data[target] == l, pca_2],c=cdict[l],s=40,label=labl[l],
-            marker=marker[l],alpha=alpha[l])
-
-    plt.xlabel("PCA_{}".format(pca_1),fontsize=14)
-    plt.ylabel("PCA_{}".format(pca_2),fontsize=14)
-    plt.legend()
-    plt.show()
-
 #Tune model and give output based on given parameters
-def tune_model(estimator, param, n_jobs, X_train, y_train, scoring_metric = 'accuracy', cv = 5, 
+def tune_model(estimator, param, n_jobs, X_train, y_train, random_state, scoring_metric = 'accuracy', cv = 5, 
                gridSearch = False, verbose = False):
+    kfolds = KFold(n_splits=cv, shuffle=True, random_state=random_state)
     if gridSearch == True:
         gsearch = GridSearchCV(estimator = estimator, param_grid = param, 
-                                    scoring=scoring_metric,n_jobs=n_jobs, cv=cv)
+                                    scoring=scoring_metric,n_jobs=n_jobs, cv=kfolds)
     else:
         gsearch = RandomizedSearchCV(estimator = estimator, param_distributions = param, 
-                                    scoring=scoring_metric,n_jobs=n_jobs, cv=cv)
+                                    scoring=scoring_metric,n_jobs=n_jobs, cv=kfolds)
     gsearch.fit(X_train, y_train)
     tuned_model= gsearch.best_estimator_ 
 
@@ -565,3 +549,20 @@ def feature_reduction(model, score_target, cv_input, X_entire_set, X_train_set, 
     plt.show()
     
     return X_entire_set[X_entire_set.columns[rfecv.support_]], rfecv.estimator_
+
+#Plot Two Dimensional PCA graph
+def pca_analysis(transformed_data, target, pca_1, pca_2, labels, labl):
+    cdict={0:'red',1:'yellow',2:'green'}
+    marker={0:'x',1:'*',2:'o'}
+    alpha={0:.5, 1:.5, 2:.2}
+    fig,ax=plt.subplots(figsize=(7,5))
+    fig.patch.set_facecolor('white')
+    for l in np.unique(labels):
+        ax.scatter(transformed_data.loc[transformed_data[target] == l, pca_1],
+            transformed_data.loc[transformed_data[target] == l, pca_2],c=cdict[l],s=40,label=labl[l],
+            marker=marker[l],alpha=alpha[l])
+
+    plt.xlabel("PCA_{}".format(pca_1),fontsize=14)
+    plt.ylabel("PCA_{}".format(pca_2),fontsize=14)
+    plt.legend()
+    plt.show()
