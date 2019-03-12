@@ -231,6 +231,16 @@ def standardize2(df):
     df = standardized_numericals  
     return df
 
+#Clip outliers based on number of standard deviations
+def sigmaclip (input, min, max):
+    mean = np.mean(input)
+    stddev = np.std(input)
+    return np.clip(
+        input,
+        mean - min * stddev,
+        mean + max * stddev
+    )
+
 #Plots heatmap of confusion matrix
 def confusion_heat_map(test_set, prediction_set):
     cm = confusion_matrix(test_set, prediction_set)
