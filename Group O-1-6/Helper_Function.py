@@ -232,6 +232,7 @@ def standardize2(df):
     return df
 
 #Clip outliers based on number of standard deviations
+#https://gist.github.com/CMCDragonkai/1e0a4e729cdf0863cc4cdacf29ad562f
 def sigmaclip (input, min, max):
     mean = np.mean(input)
     stddev = np.std(input)
@@ -331,6 +332,7 @@ def operation_years(df):
     df.loc[df['operation_year'] < 0, 'operation_year'] = 0
     return df
 
+#https://gist.github.com/CMCDragonkai/1e0a4e729cdf0863cc4cdacf29ad562f
 def haversine(lon1, lat1, lon2, lat2):
     """
     Calculate the great circle distance between two points 
