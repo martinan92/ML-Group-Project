@@ -332,7 +332,7 @@ def operation_years(df):
     df.loc[df['operation_year'] < 0, 'operation_year'] = 0
     return df
 
-#https://gist.github.com/CMCDragonkai/1e0a4e729cdf0863cc4cdacf29ad562f
+#https://stackoverflow.com/questions/4913349/haversine-formula-in-python-bearing-and-distance-between-two-gps-points
 def haversine(lon1, lat1, lon2, lat2):
     """
     Calculate the great circle distance between two points 
